@@ -1,0 +1,22 @@
+services:
+  rabbit1_tp2:
+    image: rabbitmq:3.13-management
+    hostname: rabbit_tp2
+    container_name: rabbit_tp2
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin123
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - rabbitmq_net_tp2
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+networks:
+  rabbitmq_net_tp2:
+    driver: bridge

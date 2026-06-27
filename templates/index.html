@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cluster Sync Topology - TP02</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        body { background-color: #ffffff; color: #1e293b; font-family: 'Inter', system-ui, sans-serif; margin: 0; padding: 0; height: 100vh; display: flex; flex-direction: column; }
+        header { padding: 1rem 2rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background-color: #f8fafc; }
+        .main-container { display: flex; flex: 1; overflow: hidden; }
+        .sidebar { width: 320px; border-right: 2px solid #1e293b; display: flex; flex-direction: column; background: #f8fafc; overflow-y: auto; flex-shrink: 0; }
+        .legend-container { padding: 1.5rem 0; display: flex; flex-direction: row; justify-content: center; flex-wrap: wrap; gap: 1rem; border-bottom: 1px solid #e2e8f0; background: #ffffff; }
+        .interactive-panel { padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; flex: 1; }
+        .network-container { flex: 1; position: relative; background-color: #ffffff; }
+        #network { width: 100%; height: 100%; }
+        
+        /* Legend Shapes */
+        .legend-item { display: flex; flex-direction: column; align-items: center; font-size: 0.8rem; font-weight: 600; color: #0f172a; gap: 0.5rem; text-align: center; }
+        .shape-resource { width: 32px; height: 32px; background-color: #fde047; border: 2px solid #ca8a04; border-radius: 5px; clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%); }
+        .shape-node { width: 32px; height: 20px; background-color: #7dd3fc; border: 2px solid #0284c7; border-radius: 3px; }
+        .shape-client { width: 26px; height: 26px; border-radius: 50%; background-color: #a855f7; border: 2px solid #7e22ce; }
+        
+        .log-panel {
+            flex: 1;
+            background: #0f172a;
+            border-radius: 6px;
+            padding: 10px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 11px;
+            color: #94a3b8;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .log-req { color: #facc15; }
+        .log-enter { color: #4ade80; font-weight: bold; }
+        .log-exit { color: #cbd5e1; }
+
+        @media (max-width: 768px) {
+            .main-container { flex-direction: column-reverse; overflow-y: auto; }
+            .sidebar { width: 100%; border-right: none; border-top: 2px solid #1e293b; overflow-y: visible; }
+            .network-container { height: 400px; flex: none; }
+            header { flex-direction: column; gap: 0.5rem; text-align: center; }
+            #network { height: 400px; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div>
+            <h1 class="text-2xl font-bold text-slate-800">Mapa Topológico Cluster Sync</h1>
+            <p class="text-sm text-slate-500 font-medium">Monitoramento em Tempo Real do TP02</p>
+        </div>
+        <div id="status-indicator" class="flex items-center text-sm font-semibold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200">
+            <span class="relative flex h-2 w-2 mr-2">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            Conectado ao Broker
+        </div>
+    </header>
+
+    <div class="main-container">
+        <!-- Barra Lateral -->
+        <div class="sidebar">
+            <div class="legend-container">
+                <div class="legend-item"><div class="shape-resource"></div><span>Recurso R</span></div>
+                <div class="legend-item"><div class="shape-node"></div><span>Nó (Cluster)</span></div>
+                <div class="legend-item"><div class="shape-client"></div><span>Cliente</span></div>
+            </div>
+            
+            <div class="interactive-panel flex flex-col">
+                <h2 class="text-lg font-bold text-slate-800 border-b border-slate-300 pb-2">Terminal de Eventos</h2>
+                <p class="text-xs text-slate-500 mb-2">Exclusão Mútua Distribuída (Multicast Ordenado)</p>
+                <div id="logs" class="log-panel">
+                    <!-- Logs entram aqui -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Área Principal: Gráfico de Rede -->
+        <div class="network-container">
+            <div id="network"></div>
+        </div>
+    </div>
+
+    <script>
+        // Configuração dos Nós (Nodes)
+        const nodesData = [
+            // Level 0: Recurso Crítico
+            { id: 'resource', label: 'RECURSO R\n(Livre)', shape: 'hexagon', color: { background: '#fde047', border: '#ca8a04' }, font: { face: 'Inter', size: 16, multi: true, bold: '16px Inter' }, level: 0, size: 30 }
+        ];
+
+        // Level 1: Nós do Cluster Sync (1 a 5)
+        for (let i = 1; i <= 5; i++) {
+            nodesData.push({ 
+                id: `node_${i}`, 
+                label: `Nó ${i}\n(Fila F)`, 
+                shape: 'box', 
+                color: { background: '#7dd3fc', border: '#0284c7' }, 
+                font: { face: 'Inter', size: 14 }, 
+                margin: 10, 
+                level: 1 
+            });
+        }
+
+        // Level 2: Clientes (C1 a C5)
+        for (let i = 1; i <= 5; i++) {
+            nodesData.push({ 
+                id: `client_C${i}`, 
+                label: `Cliente C${i}`, 
+                shape: 'circle', 
+                color: { background: '#d8b4fe', border: '#9333ea' }, 
+                font: { face: 'Inter', size: 12 }, 
+                level: 2,
+                margin: 5
+            });
+        }
+
+        const nodes = new vis.DataSet(nodesData);
+
+        // Configuração das Conexões (Edges)
+        const edgesData = [];
+        
+        // Ligações Clientes -> Nós (Fixo para visualização, cliente liga ao seu nó correspondente)
+        for (let i = 1; i <= 5; i++) {
+            edgesData.push({ 
+                id: `e_c${i}_n${i}`, 
+                from: `client_C${i}`, 
+                to: `node_${i}`, 
+                arrows: 'to', 
+                color: { color: '#94a3b8' }, 
+                width: 2 
+            });
+            
+            // Ligações Nós -> Recurso (Invisíveis/Cinzas até acessar a Seção Crítica)
+            edgesData.push({ 
+                id: `e_n${i}_res`, 
+                from: `node_${i}`, 
+                to: 'resource', 
+                color: { color: '#e2e8f0' }, 
+                width: 2,
+                dashes: true
+            });
+        }
+
+        const edges = new vis.DataSet(edgesData);
+
+        // Configuração da Rede Vis.js
+        const container = document.getElementById('network');
+        const data = { nodes: nodes, edges: edges };
+        const options = {
+            layout: {
+                hierarchical: {
+                    direction: 'UD', // Up-Down (Recurso no topo)
+                    sortMethod: 'directed',
+                    levelSeparation: 150,
+                    nodeSpacing: 150
+                }
+            },
+            physics: false,
+            interaction: { dragNodes: true, zoomView: true, dragView: true },
+            edges: { smooth: false } // Linhas retas para animação
+        };
+
+        const network = new vis.Network(container, data, options);
+
+        // --- SISTEMA DE ANIMAÇÃO DE BOLINHAS (IGUAL AO TP1) ---
+        let particles = [];
+        
+        function spawnParticle(fromId, toId, color, speed = 0.02) {
+            particles.push({
+                from: fromId,
+                to: toId,
+                progress: 0,
+                color: color,
+                speed: speed
+            });
+        }
+
+        network.on("afterDrawing", function (ctx) {
+            const pos = network.getPositions();
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.progress += p.speed;
+                if (p.progress >= 1) {
+                    particles.splice(i, 1);
+                    continue;
+                }
+                
+                let pos1 = pos[p.from];
+                let pos2 = pos[p.to];
+                if (!pos1 || !pos2) continue;
+
+                let x = pos1.x + (pos2.x - pos1.x) * p.progress;
+                let y = pos1.y + (pos2.y - pos1.y) * p.progress;
+
+                ctx.beginPath();
+                ctx.arc(x, y, 6, 0, 2 * Math.PI, false);
+                ctx.fillStyle = p.color;
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = "#1e293b";
+                ctx.stroke();
+            }
+        });
+
+        function animate() {
+            if (particles.length > 0) {
+                network.redraw();
+            }
+            requestAnimationFrame(animate);
+        }
+        animate();
+        // ----------------------------------------
+
+        // Lógica de Logs do Sidebar
+        const logsContainer = document.getElementById('logs');
+        function addLog(msg, typeClass) {
+            const el = document.createElement('div');
+            el.className = `log-entry ${typeClass}`;
+            el.innerText = `> ${msg}`;
+            logsContainer.appendChild(el);
+            logsContainer.scrollTop = logsContainer.scrollHeight;
+        }
+
+        // SSE: Recebendo dados em tempo real
+        const eventSource = new EventSource("/stream");
+        const statusInd = document.getElementById('status-indicator');
+
+        eventSource.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            
+            if (data.type === 'CLIENT_REQ') {
+                const cId = `client_${data.client_id}`;
+                const nId = `node_${data.node_id}`;
+                
+                // Cliente brilha e manda bolinha pro nó (ACQUIRE)
+                nodes.update({ id: cId, color: { background: '#c084fc', border: '#7e22ce' } });
+                spawnParticle(cId, nId, '#facc15', 0.03); // Bolinha amarela = Pedido
+                
+                addLog(`Cliente ${data.client_id} -> ACQUIRE no Nó ${data.node_id}`, 'log-req');
+            }
+            else if (data.type === 'NODE_ENTER') {
+                const nId = `node_${data.node_id}`;
+                
+                // Nó fica verde, aresta até o recurso fica verde sólida
+                nodes.update({ id: nId, color: { background: '#4ade80', border: '#166534' } });
+                nodes.update({ id: 'resource', label: `RECURSO R\n(Uso: Nó ${data.node_id})`, color: { background: '#22c55e', border: '#14532d' }});
+                
+                edges.update({ id: `e_n${data.node_id}_res`, color: { color: '#22c55e' }, width: 4, dashes: false });
+                
+                // Bolinha verde subindo pro recurso
+                spawnParticle(nId, 'resource', '#4ade80', 0.05);
+                
+                addLog(`Nó ${data.node_id} ENTROU na Sec. Crítica!`, 'log-enter');
+            }
+            else if (data.type === 'NODE_EXIT') {
+                const cId = `client_${data.client_id}`;
+                const nId = `node_${data.node_id}`;
+                
+                // Restaura cores
+                nodes.update({ id: nId, color: { background: '#7dd3fc', border: '#0284c7' } });
+                nodes.update({ id: cId, color: { background: '#d8b4fe', border: '#9333ea' } });
+                nodes.update({ id: 'resource', label: 'RECURSO R\n(Livre)', color: { background: '#fde047', border: '#ca8a04' }});
+                
+                edges.update({ id: `e_n${data.node_id}_res`, color: { color: '#e2e8f0' }, width: 2, dashes: true });
+                
+                // Bolinha roxa (COMMITTED) voltando pro cliente
+                spawnParticle(nId, cId, '#c084fc', 0.04);
+                
+                addLog(`Nó ${data.node_id} LIBEROU o recurso.`, 'log-exit');
+            }
+        };
+
+        eventSource.onerror = function() {
+            statusInd.classList.replace('text-emerald-600', 'text-red-600');
+            statusInd.classList.replace('bg-emerald-50', 'bg-red-50');
+            statusInd.classList.replace('border-emerald-200', 'border-red-200');
+            statusInd.innerHTML = `<span class="h-2 w-2 mr-2 rounded-full bg-red-500"></span> Conexão Perdida`;
+        };
+    </script>
+</body>
+</html>
