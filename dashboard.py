@@ -61,6 +61,46 @@ def stream():
             
     return Response(event_stream(), content_type="text/event-stream")
 
+import uuid
+
+@app.route("/force_request/<client_id>", methods=["POST"])
+def force_request(client_id):
+    """Endpoint chamado pelo clique no front-end para forçar um pedido de cliente."""
+    try:
+        # Pega o número do cliente (ex: C3 -> 3)
+        node_num = client_id.replace("C", "")
+        
+        credentials = pika.PlainCredentials('admin', 'admin123')
+        params = pika.ConnectionParameters(host='localhost', credentials=credentials)
+        connection = pika.BlockingConnection(params)
+        channel = connection.channel()
+        
+        # Envia telemetria fake para o painel brilhar instantaneamente
+        import json
+        dash_event = {"type": "CLIENT_REQ", "client_id": client_id, "node_id": node_num}
+        channel.basic_publish(exchange='dashboard_topic', routing_key='', body=json.dumps(dash_event))
+        
+        # Publica o pedido real na fila do Nó correspondente
+        msg = {
+            'client_id': f"{client_id} (Manual)", 
+            'timestamp': time.time(),
+            'req_id': str(uuid.uuid4())
+        }
+        
+        target_queue = f'rpc_queue_{node_num}'
+        channel.basic_publish(
+            exchange='',
+            routing_key=target_queue,
+            body=json.dumps(msg)
+        )
+        
+        connection.close()
+        return {"status": "ok"}
+    except Exception as e:
+        print("Erro ao forçar request:", e)
+        return {"status": "error"}
+
+
 if __name__ == "__main__":
     # Inicia o consumidor do RabbitMQ em uma thread separada
     threading.Thread(target=pika_consumer, daemon=True).start()

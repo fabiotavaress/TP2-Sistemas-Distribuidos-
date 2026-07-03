@@ -40,11 +40,11 @@
         .log-exit { color: #cbd5e1; }
 
         @media (max-width: 768px) {
-            .main-container { flex-direction: column-reverse; overflow-y: auto; }
-            .sidebar { width: 100%; border-right: none; border-top: 2px solid #1e293b; overflow-y: visible; }
-            .network-container { height: 400px; flex: none; }
+            .main-container { flex-direction: column; overflow-y: auto; }
+            .sidebar { width: 100%; border-right: none; overflow: visible; }
+            .network-container { position: sticky; top: 0; z-index: 10; height: 55vh; border-bottom: 2px solid #1e293b; flex: none; background: #ffffff; }
             header { flex-direction: column; gap: 0.5rem; text-align: center; }
-            #network { height: 400px; }
+            #network { height: 100%; }
         }
     </style>
 </head>
@@ -69,7 +69,7 @@
             <div class="legend-container">
                 <div class="legend-item"><div class="shape-resource"></div><span>Recurso R</span></div>
                 <div class="legend-item"><div class="shape-node"></div><span>Nó (Cluster)</span></div>
-                <div class="legend-item"><div class="shape-client"></div><span>Cliente</span></div>
+                <div class="legend-item"><div class="shape-client"></div><span>Cliente (Clique-me)</span></div>
             </div>
             
             <div class="interactive-panel flex flex-col">
@@ -226,6 +226,25 @@
             logsContainer.appendChild(el);
             logsContainer.scrollTop = logsContainer.scrollHeight;
         }
+
+        // Interatividade: Clique nos clientes para forçar um pedido
+        network.on("click", function (params) {
+            if (params.nodes.length > 0) {
+                const nodeId = params.nodes[0];
+                if (nodeId.startsWith("client_C")) {
+                    const clientId = nodeId.replace("client_", "");
+                    
+                    // Brilho amarelo rápido de feedback
+                    nodes.update({ id: nodeId, color: { background: '#facc15' } });
+                    setTimeout(() => {
+                        nodes.update({ id: nodeId, color: { background: '#d8b4fe', border: '#9333ea' } });
+                    }, 300);
+                    
+                    // Chama a API do Flask para forçar o pedido
+                    fetch('/force_request/' + clientId, { method: 'POST' });
+                }
+            }
+        });
 
         // SSE: Recebendo dados em tempo real
         const eventSource = new EventSource("/stream");
