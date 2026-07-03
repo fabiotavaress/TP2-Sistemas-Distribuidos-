@@ -67,3 +67,10 @@ O dashboard traduz a matemática da Exclusão Mútua para o mundo visual, facili
 - **Seção Crítica Garantida:** O RabbitMQ organiza as mensagens perfeitamente e os Nós respeitam a Fila `F`. Quando finalmente é a vez do Nó, ele fica **Verde Brilhante** e uma linha verde sólida o conecta com exclusividade ao Recurso R no topo. 
 - **Prova Prática:** Você notará perfeitamente, olhando para o desenho animado, que **dois Nós nunca ficam verdes ao mesmo tempo**, garantindo visualmente a Exclusão Mútua e a Alternativa 3!
 - **Liberação (RELEASE):** Ao terminar o uso (sleep), o Nó volta a ficar azul e dispara uma partícula roxa (`COMMITTED`) de volta para o cliente, que então "dorme" satisfeito.
+
+### 🎮 Demonstração Interativa na Apresentação
+O Dashboard foi projetado para **alta concorrência** e suporta que múltiplos usuários (ex: uma sala inteira de 40 alunos) acessem o link pelo celular e **cliquem fisicamente nos Clientes (bolinhas roxas)**.
+Essa interação direta demonstra os conceitos mais importantes do trabalho prático:
+1. **Garantia da Exclusão Mútua:** Mesmo que 40 pessoas cliquem no exato mesmo segundo junto com os clientes automáticos, o recurso R **NUNCA** ficará verde para dois nós simultaneamente. A regra nunca é quebrada.
+2. **Multicast Ordenado em Ação:** Prova o funcionamento da Alternativa 3. Como os cliques geram pedidos que entram no mesmo "tubo" (`R_topic`) no RabbitMQ, todos os Nós do cluster enxergam esses pedidos na exata mesma ordem. Todos concluem quem é o próximo, sem precisarem de um Nó mestre.
+3. **Assincronia e Resiliência:** Demonstra que os Nós aguentam picos massivos de concorrência. Se milhares de cliques chegarem ao mesmo tempo, eles enfileiram com segurança no RabbitMQ e o sistema distribui o recurso com cadência, sem perder requisições e sem travar.
