@@ -82,13 +82,14 @@ def process_F(channel, connection):
             body=json.dumps(msg_release)
         )
         
-        # Responde ao cliente
-        channel.basic_publish(
-            exchange='',
-            routing_key=props.reply_to,
-            properties=pika.BasicProperties(correlation_id=props.correlation_id),
-            body=json.dumps({'status': 'COMMITTED'})
-        )
+        # Responde ao cliente, apenas se for um cliente de verdade (com fila de reply_to)
+        if props.reply_to:
+            channel.basic_publish(
+                exchange='',
+                routing_key=props.reply_to,
+                properties=pika.BasicProperties(correlation_id=props.correlation_id),
+                body=json.dumps({'status': 'COMMITTED'})
+            )
 
 def on_rpc_request(ch, method, props, body):
     """Quando o nó recebe um pedido do cliente"""
