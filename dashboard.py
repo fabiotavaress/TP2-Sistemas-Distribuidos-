@@ -102,7 +102,7 @@ def force_request(client_id):
         publish_queue.put({"type": "FAKE_TELEMETRY", "payload": dash_event})
         
         msg = {
-            'client_id': f"{client_id} (Turma)", 
+            'client_id': client_id, 
             'timestamp': time.time(),
             'req_id': str(uuid.uuid4())
         }
