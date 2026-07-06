@@ -306,15 +306,21 @@
             else if (data.type === 'NODE_ENTER') {
                 const nId = `node_${data.node_id}`;
                 
-                // Nó fica verde, exchange e recurso ficam verdes
+                // Antes de tudo: reseta TODOS os nós e arestas (garante que só 1 fica verde por vez)
+                for (let i = 1; i <= 5; i++) {
+                    nodes.update({ id: `node_${i}`, color: { background: '#7dd3fc', border: '#0284c7' } });
+                    nodes.update({ id: `client_C${i}`, color: { background: '#d8b4fe', border: '#9333ea' } });
+                    edges.update({ id: `e_n${i}_exchange`, color: { color: '#cbd5e1' }, width: 2, dashes: true });
+                }
+
+                // Agora acende APENAS o nó que está na seção crítica
                 nodes.update({ id: nId, color: { background: '#4ade80', border: '#166534' } });
                 nodes.update({ id: 'resource', label: `RECURSO R\n(Uso: Nó ${data.node_id})`, color: { background: '#22c55e', border: '#14532d' }});
                 nodes.update({ id: 'exchange', color: { background: '#1e4d2b', border: '#22c55e' } });
-                
                 edges.update({ id: `e_n${data.node_id}_exchange`, color: { color: '#22c55e' }, width: 4, dashes: false });
                 edges.update({ id: 'e_res_exchange', color: { color: '#22c55e' }, width: 3, dashes: false });
                 
-                // Bolinha verde segue o trilho: Nó → Exchange → Recurso
+                // Bolinha verde: Nó → Exchange → Recurso
                 spawnParticle([nId, 'exchange', 'resource'], '#4ade80', 0.013);
                 
                 addLog(`Nó ${data.node_id} ENTROU na Sec. Crítica!`, 'log-enter');
