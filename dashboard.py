@@ -14,6 +14,15 @@ listeners = []
 # Fila thread-safe para aguentar milhares de cliques simultâneos
 publish_queue = queue.Queue()
 
+# Estado global: True = nós rodando, cliques bloqueados
+clicks_locked = False
+
+def broadcast(event):
+    """Envia um evento SSE para todos os navegadores conectados."""
+    msg = json.dumps(event)
+    for l in listeners:
+        l.append(msg)
+
 def pika_consumer():
     """Thread que escuta os eventos do RabbitMQ em background."""
     credentials = pika.PlainCredentials('admin', 'admin123')
@@ -93,25 +102,40 @@ def stream():
 @app.route("/force_request/<client_id>", methods=["POST"])
 def force_request(client_id):
     """Endpoint chamado pelo clique no front-end para forçar um pedido de cliente."""
+    if clicks_locked:
+        return {"status": "locked"}, 423  # 423 = Locked
     try:
-        # Pega o número do cliente (ex: C3 -> 3)
         node_num = client_id.replace("C", "")
-        
-        # Joga na fila do Publisher (Super rápido, não bloqueia o navegador do aluno)
         dash_event = {"type": "CLIENT_REQ", "client_id": client_id, "node_id": node_num}
         publish_queue.put({"type": "FAKE_TELEMETRY", "payload": dash_event})
-        
         msg = {
             'client_id': client_id, 
             'timestamp': time.time(),
             'req_id': str(uuid.uuid4())
         }
         publish_queue.put({"type": "REAL_REQ", "queue": f'rpc_queue_{node_num}', "payload": msg})
-        
         return {"status": "ok"}
     except Exception as e:
         print("Erro ao forçar request:", e)
         return {"status": "error"}
+
+@app.route("/lock", methods=["POST"])
+def lock_clicks():
+    """Chamado pelo run_simulation.py ao iniciar os nós. Bloqueia novos cliques."""
+    global clicks_locked
+    clicks_locked = True
+    broadcast({"type": "LOCK_CLICKS"})
+    print("[Dashboard] Cliques BLOQUEADOS — Nós processando pedidos.")
+    return {"status": "locked"}
+
+@app.route("/unlock", methods=["POST"])
+def unlock_clicks():
+    """Chamado pelo run_simulation.py ao encerrar. Libera os cliques novamente."""
+    global clicks_locked
+    clicks_locked = False
+    broadcast({"type": "UNLOCK_CLICKS"})
+    print("[Dashboard] Cliques LIBERADOS — Pode fazer novos pedidos.")
+    return {"status": "unlocked"}
 
 if __name__ == "__main__":
     # Inicia as threads do RabbitMQ

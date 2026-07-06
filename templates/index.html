@@ -63,6 +63,11 @@
         </div>
     </header>
 
+    <!-- Banner de bloqueio (aparece quando os nós estão processando) -->
+    <div id="lock-banner" style="display:none; background:#dc2626; color:white; text-align:center; padding:10px 16px; font-size:0.9rem; font-weight:700; letter-spacing:0.05em;">
+        ⛔ PROCESSANDO PEDIDOS — Aguarde os nós consumirem a fila antes de fazer novos pedidos
+    </div>
+
     <div class="main-container">
         <!-- Barra Lateral -->
         <div class="sidebar">
@@ -262,20 +267,20 @@
             logsContainer.scrollTop = logsContainer.scrollHeight;
         }
 
+        // Estado de bloqueio de cliques
+        let clicksLocked = false;
+
         // Interatividade: Clique nos clientes para forçar um pedido
         network.on("click", function (params) {
+            if (clicksLocked) return; // Ignora cliques enquanto bloqueado
             if (params.nodes.length > 0) {
                 const nodeId = params.nodes[0];
                 if (nodeId.startsWith("client_C")) {
                     const clientId = nodeId.replace("client_", "");
-                    
-                    // Brilho amarelo rápido de feedback
                     nodes.update({ id: nodeId, color: { background: '#facc15' } });
                     setTimeout(() => {
                         nodes.update({ id: nodeId, color: { background: '#d8b4fe', border: '#9333ea' } });
                     }, 300);
-                    
-                    // Chama a API do Flask para forçar o pedido
                     fetch('/force_request/' + clientId, { method: 'POST' });
                 }
             }
@@ -339,6 +344,14 @@
                 edges.update({ id: 'e_res_exchange', color: { color: '#3b82f6' }, width: 2, dashes: true });
                 
                 addLog(`Nó ${data.node_id} LIBEROU o recurso.`, 'log-exit');
+            }
+            else if (data.type === 'LOCK_CLICKS') {
+                clicksLocked = true;
+                document.getElementById('lock-banner').style.display = 'block';
+            }
+            else if (data.type === 'UNLOCK_CLICKS') {
+                clicksLocked = false;
+                document.getElementById('lock-banner').style.display = 'none';
             }
         };
 
