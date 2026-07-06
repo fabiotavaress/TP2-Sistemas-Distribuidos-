@@ -195,7 +195,7 @@
         // --- SISTEMA DE ANIMAÇÃO DE BOLINHAS (IGUAL AO TP1) ---
         let particles = [];
         
-        function spawnParticle(fromId, toId, color, speed = 0.02) {
+        function spawnParticle(fromId, toId, color, speed = 0.012) {
             particles.push({
                 from: fromId,
                 to: toId,
@@ -223,7 +223,7 @@
                 let y = pos1.y + (pos2.y - pos1.y) * p.progress;
 
                 ctx.beginPath();
-                ctx.arc(x, y, 6, 0, 2 * Math.PI, false);
+                ctx.arc(x, y, 9, 0, 2 * Math.PI, false);
                 ctx.fillStyle = p.color;
                 ctx.fill();
                 ctx.lineWidth = 2;
@@ -284,8 +284,8 @@
                 // Cliente brilha e manda bolinha pro nó (ACQUIRE)
                 nodes.update({ id: cId, color: { background: '#c084fc', border: '#7e22ce' } });
                 // Bolinha amarela: Cliente -> Nó -> Exchange (ACQUIRE percorrendo o caminho real)
-                spawnParticle(cId, nId, '#facc15', 0.04);
-                setTimeout(() => spawnParticle(nId, 'exchange', '#facc15', 0.04), 600);
+                spawnParticle(cId, nId, '#facc15', 0.013);
+                setTimeout(() => spawnParticle(nId, 'exchange', '#facc15', 0.013), 1400);
                 
                 addLog(`Cliente ${data.client_id} -> ACQUIRE no Nó ${data.node_id}`, 'log-req');
             }
@@ -301,8 +301,8 @@
                 edges.update({ id: 'e_res_exchange', color: { color: '#22c55e' }, width: 3, dashes: false });
                 
                 // Bolinha verde: Nó -> Exchange -> Recurso (chegou na vez!)
-                spawnParticle(nId, 'exchange', '#4ade80', 0.05);
-                setTimeout(() => spawnParticle('exchange', 'resource', '#4ade80', 0.05), 400);
+                spawnParticle(nId, 'exchange', '#4ade80', 0.015);
+                setTimeout(() => spawnParticle('exchange', 'resource', '#4ade80', 0.015), 1200);
                 
                 addLog(`Nó ${data.node_id} ENTROU na Sec. Crítica!`, 'log-enter');
             }
@@ -320,8 +320,8 @@
                 edges.update({ id: 'e_res_exchange', color: { color: '#3b82f6' }, width: 2, dashes: true });
                 
                 // Bolinha roxa (RELEASE/COMMITTED): Exchange -> Nó -> Cliente
-                spawnParticle('exchange', nId, '#c084fc', 0.04);
-                setTimeout(() => spawnParticle(nId, cId, '#c084fc', 0.04), 500);
+                spawnParticle('exchange', nId, '#c084fc', 0.013);
+                setTimeout(() => spawnParticle(nId, cId, '#c084fc', 0.013), 1400);
                 
                 addLog(`Nó ${data.node_id} LIBEROU o recurso.`, 'log-exit');
             }
