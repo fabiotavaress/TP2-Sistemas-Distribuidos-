@@ -42,6 +42,7 @@
         @media (max-width: 768px) {
             .main-container { flex-direction: column; overflow-y: auto; }
             .sidebar { width: 100%; border-right: none; overflow: visible; }
+            .queue-sidebar { width: 100%; border-left: none; border-top: 2px solid #1e293b; height: 250px; }
             .network-container { position: sticky; top: 0; z-index: 10; height: 55vh; border-bottom: 2px solid #1e293b; flex: none; background: #ffffff; }
             header { flex-direction: column; gap: 0.5rem; text-align: center; }
             #network { height: 100%; }
@@ -89,6 +90,20 @@
         <!-- Área Principal: Gráfico de Rede -->
         <div class="network-container">
             <div id="network"></div>
+        </div>
+
+        <!-- NOVO: Barra Lateral Direita (Fila Distribuída) -->
+        <div class="queue-sidebar" style="width: 280px; border-left: 2px solid #1e293b; background: #f8fafc; display: flex; flex-direction: column; flex-shrink: 0;">
+            <div class="p-4 border-b border-slate-200 bg-white">
+                <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
+                    Fila Compartilhada
+                </h2>
+                <p class="text-xs text-slate-500 mt-1">Estado replicado em todos os nós (F)</p>
+            </div>
+            <div id="queue-list" class="flex-1 p-4 overflow-y-auto flex flex-col gap-2 bg-slate-50">
+                <div class="text-xs text-slate-400 text-center italic mt-4">Fila vazia</div>
+            </div>
         </div>
     </div>
 
@@ -259,12 +274,35 @@
 
         // Lógica de Logs do Sidebar
         const logsContainer = document.getElementById('logs');
-        function addLog(msg, typeClass) {
-            const el = document.createElement('div');
-            el.className = `log-entry ${typeClass}`;
-            el.innerText = `> ${msg}`;
-            logsContainer.appendChild(el);
+        function addLog(message, cssClass) {
+            const logsContainer = document.getElementById('logs');
+            const logEntry = document.createElement('div');
+            logEntry.className = cssClass;
+            logEntry.textContent = `> ${message}`;
+            logsContainer.appendChild(logEntry);
             logsContainer.scrollTop = logsContainer.scrollHeight;
+        }
+
+        // --- SISTEMA DA FILA VISUAL ---
+        let globalQueue = [];
+
+        function renderQueue() {
+            const container = document.getElementById('queue-list');
+            if (globalQueue.length === 0) {
+                container.innerHTML = '<div class="text-xs text-slate-400 text-center italic mt-4">Fila vazia</div>';
+                return;
+            }
+            container.innerHTML = globalQueue.map((item, index) => `
+                <div class="flex items-center gap-3 bg-white border ${index === 0 ? 'border-indigo-400 shadow-md' : 'border-slate-200 shadow-sm'} p-2 rounded text-sm transition-all">
+                    <div class="flex-shrink-0 w-6 h-6 rounded-full ${index === 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-500'} border ${index === 0 ? 'border-indigo-300' : 'border-slate-300'} flex items-center justify-center font-bold text-xs">
+                        ${index + 1}
+                    </div>
+                    <div class="flex-1 font-semibold ${index === 0 ? 'text-indigo-900' : 'text-slate-700'}">
+                        Cliente ${item.client}
+                        <div class="text-[10px] font-normal ${index === 0 ? 'text-indigo-500' : 'text-slate-400'} uppercase tracking-wide mt-0.5">Destino: Nó ${item.node}</div>
+                    </div>
+                </div>
+            `).join('');
         }
 
         // Estado de bloqueio de cliques
@@ -299,6 +337,10 @@
                 
                 nodes.update({ id: cId, color: { background: '#facc15', border: '#ca8a04' } });
                 
+                // Adiciona na Fila Visual e renderiza
+                globalQueue.push({ client: data.client_id.replace('C', ''), node: data.node_id });
+                renderQueue();
+                
                 // Permite até MAX_ACQUIRE_PARTICLES bolinhas amarelas ao mesmo tempo
                 const yellowCount = particles.filter(p => p.color === '#facc15').length;
                 if (yellowCount < MAX_ACQUIRE_PARTICLES) {
@@ -311,6 +353,13 @@
             else if (data.type === 'NODE_ENTER') {
                 const nId = `node_${data.node_id}`;
                 
+                // Remove o item da fila visual (o primeiro correspondente a este nó)
+                const idx = globalQueue.findIndex(item => item.node == data.node_id);
+                if (idx !== -1) {
+                    globalQueue.splice(idx, 1);
+                    renderQueue();
+                }
+
                 // Antes de tudo: reseta TODOS os nós e arestas (garante que só 1 fica verde por vez)
                 for (let i = 1; i <= 5; i++) {
                     nodes.update({ id: `node_${i}`, color: { background: '#7dd3fc', border: '#0284c7' } });
@@ -363,6 +412,10 @@
                 nodes.update({ id: 'resource', label: 'RECURSO R\n(Livre)', color: { background: '#fde047', border: '#ca8a04' }});
                 nodes.update({ id: 'exchange', color: { background: '#1e3a5f', border: '#3b82f6' } });
                 edges.update({ id: 'e_res_exchange', color: { color: '#3b82f6' }, width: 2, dashes: true });
+                
+                // Limpa a fila por segurança
+                globalQueue = [];
+                renderQueue();
             }
         };
 
