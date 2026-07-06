@@ -374,8 +374,8 @@
                 edges.update({ id: `e_n${data.node_id}_exchange`, color: { color: '#22c55e' }, width: 4, dashes: false });
                 edges.update({ id: 'e_res_exchange', color: { color: '#22c55e' }, width: 3, dashes: false });
                 
-                // Bolinha verde: Nó → Exchange → Recurso
-                spawnParticle([nId, 'exchange', 'resource'], '#4ade80', 0.013);
+                // Bolinha verde: Nó → Exchange → Recurso (Andando bem devagar)
+                spawnParticle([nId, 'exchange', 'resource'], '#4ade80', 0.005);
                 
                 addLog(`Nó ${data.node_id} ENTROU na Sec. Crítica!`, 'log-enter');
             }
