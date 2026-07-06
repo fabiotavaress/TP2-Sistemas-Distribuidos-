@@ -58,8 +58,8 @@ def process_F(channel, connection):
         dash_enter = {"type": "NODE_ENTER", "node_id": NODE_ID, "client_id": client_id}
         channel.basic_publish(exchange='dashboard_topic', routing_key='', body=json.dumps(dash_enter))
         
-        # Sleep de 2 a 4 segundos para a apresentação — tempo suficiente para ver o nó verde na tela
-        connection.sleep(random.uniform(2.0, 4.0))
+        # Sleep de 4 a 6 segundos para a apresentação — tempo suficiente para ver o nó verde na tela e a fila reduzindo
+        connection.sleep(random.uniform(4.0, 6.0))
         
         log(f"Saindo da Seção Crítica.", Fore.RED)
         

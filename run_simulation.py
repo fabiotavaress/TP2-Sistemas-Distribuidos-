@@ -44,6 +44,9 @@ def main():
 
     try:
         notify_dashboard("lock")
+        
+        print("\n[Aguardando 2 segundos antes de iniciar o processamento...]\n")
+        time.sleep(2)
 
         for i in range(1, 6):
             print(f"Iniciando No {i}...")
