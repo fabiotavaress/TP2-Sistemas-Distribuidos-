@@ -192,13 +192,15 @@
 
         const network = new vis.Network(container, data, options);
 
-        // --- SISTEMA DE ANIMAÇÃO DE BOLINHAS (IGUAL AO TP1) ---
+        // --- SISTEMA DE ANIMAÇÃO DE BOLINHAS ---
         let particles = [];
         
-        function spawnParticle(fromId, toId, color, speed = 0.012) {
+        // Recebe um array de IDs de nós e anima a bolinha passando por cada trecho em sequência
+        function spawnParticle(path, color, speed = 0.012) {
+            if (path.length < 2) return;
             particles.push({
-                from: fromId,
-                to: toId,
+                path: path,
+                segIndex: 0,        // índice do trecho atual (0 = path[0]→path[1])
                 progress: 0,
                 color: color,
                 speed: speed
@@ -210,13 +212,22 @@
             for (let i = particles.length - 1; i >= 0; i--) {
                 let p = particles[i];
                 p.progress += p.speed;
+
+                // Terminou este trecho — avança para o próximo ou remove
                 if (p.progress >= 1) {
-                    particles.splice(i, 1);
+                    p.segIndex++;
+                    if (p.segIndex >= p.path.length - 1) {
+                        particles.splice(i, 1);
+                    } else {
+                        p.progress = 0;
+                    }
                     continue;
                 }
-                
-                let pos1 = pos[p.from];
-                let pos2 = pos[p.to];
+
+                const fromId = p.path[p.segIndex];
+                const toId   = p.path[p.segIndex + 1];
+                let pos1 = pos[fromId];
+                let pos2 = pos[toId];
                 if (!pos1 || !pos2) continue;
 
                 let x = pos1.x + (pos2.x - pos1.x) * p.progress;
@@ -233,9 +244,7 @@
         });
 
         function animate() {
-            if (particles.length > 0) {
-                network.redraw();
-            }
+            if (particles.length > 0) network.redraw();
             requestAnimationFrame(animate);
         }
         animate();
@@ -284,8 +293,8 @@
                 // Cliente brilha em amarelo
                 nodes.update({ id: cId, color: { background: '#facc15', border: '#ca8a04' } });
                 
-                // 1 bolinha amarela: Cliente → Exchange (ACQUIRE indo direto ao broker)
-                spawnParticle(cId, 'exchange', '#facc15', 0.012);
+                // Bolinha amarela segue o trilho: Cliente → Nó → Exchange
+                spawnParticle([cId, nId, 'exchange'], '#facc15', 0.013);
                 
                 addLog(`Cliente ${data.client_id} → ACQUIRE no Nó ${data.node_id}`, 'log-req');
             }
@@ -300,8 +309,8 @@
                 edges.update({ id: `e_n${data.node_id}_exchange`, color: { color: '#22c55e' }, width: 4, dashes: false });
                 edges.update({ id: 'e_res_exchange', color: { color: '#22c55e' }, width: 3, dashes: false });
                 
-                // 1 bolinha verde: Nó → Recurso (acesso concedido!)
-                spawnParticle(nId, 'resource', '#4ade80', 0.012);
+                // Bolinha verde segue o trilho: Nó → Exchange → Recurso
+                spawnParticle([nId, 'exchange', 'resource'], '#4ade80', 0.013);
                 
                 addLog(`Nó ${data.node_id} ENTROU na Sec. Crítica!`, 'log-enter');
             }
@@ -318,8 +327,8 @@
                 edges.update({ id: `e_n${data.node_id}_exchange`, color: { color: '#cbd5e1' }, width: 2, dashes: true });
                 edges.update({ id: 'e_res_exchange', color: { color: '#3b82f6' }, width: 2, dashes: true });
                 
-                // 1 bolinha roxa: Exchange → Cliente (COMMITTED chegando de volta)
-                spawnParticle('exchange', cId, '#c084fc', 0.012);
+                // Bolinha roxa segue o trilho: Exchange → Nó → Cliente
+                spawnParticle(['exchange', nId, cId], '#c084fc', 0.013);
                 
                 addLog(`Nó ${data.node_id} LIBEROU o recurso.`, 'log-exit');
             }
