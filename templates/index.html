@@ -374,8 +374,11 @@
                 edges.update({ id: `e_n${data.node_id}_exchange`, color: { color: '#22c55e' }, width: 4, dashes: false });
                 edges.update({ id: 'e_res_exchange', color: { color: '#22c55e' }, width: 3, dashes: false });
                 
-                // Bolinha verde: Nó → Exchange → Recurso (Andando bem devagar)
-                spawnParticle([nId, 'exchange', 'resource'], '#4ade80', 0.005);
+                // Limpa QUALQUER bolinha verde antiga que ainda esteja na tela (Garante SÓ 1 por vez!)
+                particles = particles.filter(p => p.color !== '#4ade80');
+                
+                // Bolinha verde: Nó → Exchange → Recurso (Velocidade ideal)
+                spawnParticle([nId, 'exchange', 'resource'], '#4ade80', 0.010);
                 
                 addLog(`Nó ${data.node_id} ENTROU na Sec. Crítica!`, 'log-enter');
             }
