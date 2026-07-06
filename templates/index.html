@@ -194,13 +194,14 @@
 
         // --- SISTEMA DE ANIMAÇÃO DE BOLINHAS ---
         let particles = [];
+        let acquireInFlight = false; // Garante que só 1 bolinha de ACQUIRE sobe por vez
         
         // Recebe um array de IDs de nós e anima a bolinha passando por cada trecho em sequência
         function spawnParticle(path, color, speed = 0.012) {
             if (path.length < 2) return;
             particles.push({
                 path: path,
-                segIndex: 0,        // índice do trecho atual (0 = path[0]→path[1])
+                segIndex: 0,
                 progress: 0,
                 color: color,
                 speed: speed
@@ -218,6 +219,7 @@
                     p.segIndex++;
                     if (p.segIndex >= p.path.length - 1) {
                         particles.splice(i, 1);
+                        acquireInFlight = false; // libera para o próximo ACQUIRE
                     } else {
                         p.progress = 0;
                     }
@@ -293,8 +295,11 @@
                 // Cliente brilha em amarelo
                 nodes.update({ id: cId, color: { background: '#facc15', border: '#ca8a04' } });
                 
-                // Bolinha amarela segue o trilho: Cliente → Nó → Exchange
-                spawnParticle([cId, nId, 'exchange'], '#facc15', 0.013);
+                // Só sobe 1 bolinha ACQUIRE por vez para não poluir a tela
+                if (!acquireInFlight) {
+                    acquireInFlight = true;
+                    spawnParticle([cId, nId, 'exchange'], '#facc15', 0.013);
+                }
                 
                 addLog(`Cliente ${data.client_id} → ACQUIRE no Nó ${data.node_id}`, 'log-req');
             }
@@ -318,7 +323,7 @@
                 const cId = `client_${data.client_id}`;
                 const nId = `node_${data.node_id}`;
                 
-                // Restaura todas as cores
+                // Restaura todas as cores — sem bolinha de volta (COMMITTED é detalhe interno)
                 nodes.update({ id: nId, color: { background: '#7dd3fc', border: '#0284c7' } });
                 nodes.update({ id: cId, color: { background: '#d8b4fe', border: '#9333ea' } });
                 nodes.update({ id: 'resource', label: 'RECURSO R\n(Livre)', color: { background: '#fde047', border: '#ca8a04' }});
@@ -326,9 +331,6 @@
                 
                 edges.update({ id: `e_n${data.node_id}_exchange`, color: { color: '#cbd5e1' }, width: 2, dashes: true });
                 edges.update({ id: 'e_res_exchange', color: { color: '#3b82f6' }, width: 2, dashes: true });
-                
-                // Bolinha roxa segue o trilho: Exchange → Nó → Cliente
-                spawnParticle(['exchange', nId, cId], '#c084fc', 0.013);
                 
                 addLog(`Nó ${data.node_id} LIBEROU o recurso.`, 'log-exit');
             }
