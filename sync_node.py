@@ -57,8 +57,10 @@ def process_F(channel, connection):
         dash_enter = {"type": "NODE_ENTER", "node_id": NODE_ID, "client_id": client_id}
         channel.basic_publish(exchange='dashboard_topic', routing_key='', body=json.dumps(dash_enter))
         
-        # Sleep fixo de 2.5s para sincronizar perfeitamente com a animação da bolinha verde no front
-        connection.sleep(2.5)
+        # OBRIGATÓRIO usar time.sleep() ao invés de connection.sleep()!
+        # connection.sleep() libera o event loop do Pika, fazendo com que mensagens de background
+        # disparem on_sync_message DE NOVO enquanto o nó está na Seção Crítica, causando recursão infinita!
+        time.sleep(2.5)
         
         log(f"Saindo da Seção Crítica.", Fore.RED)
         
