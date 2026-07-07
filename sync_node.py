@@ -40,10 +40,9 @@ def log(msg, color=Fore.WHITE):
     print(color + f"[Node {NODE_ID}] {msg}")
 
 def process_F(channel, connection):
-    """
-    Avalia a fila F. Se o topo for uma requisição DESTE nó, entra na seção crítica.
-    """
-    global F
+    global F, cluster_ready
+    if not cluster_ready:
+        return
     if not F:
         return
     
@@ -142,9 +141,11 @@ def on_sync_message(ch, method, props, body):
         F = [req for req in F if req['req_id'] != req_id_to_remove]
     
     ch.basic_ack(delivery_tag=method.delivery_tag)
-    process_F(ch, ch.connection)
+    if cluster_ready:
+        process_F(ch, ch.connection)
 
 def main():
+    global cluster_ready
     log("Iniciando Node do Cluster Sync...", Fore.YELLOW)
     connection = conectar()
     channel = connection.channel()
@@ -161,6 +162,15 @@ def main():
     # 3. Inicia a thread que consome os pedidos dos clientes paralelamente
     t = threading.Thread(target=rpc_consumer_thread, daemon=True)
     t.start()
+    
+    # 4. Fase de Consenso (Aguarda 1.5s para todos os nós publicarem e receberem todos os ACQUIREs)
+    # Isso garante que a fila F será completamente povoada e ordenada cronologicamente ANTES do algoritmo iniciar!
+    log("Aguardando consenso cronologico das requisicoes (1.5s)...", Fore.CYAN)
+    time.sleep(1.5)
+    
+    # 5. Habilita o processamento e dá o primeiro gatilho
+    cluster_ready = True
+    process_F(channel, connection)
     
     log(f"Node operante. Escutando clientes na fila {rpc_queue_name} e sinc. na {sync_queue}", Fore.YELLOW)
     
