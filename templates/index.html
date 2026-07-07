@@ -214,46 +214,54 @@
 
         const network = new vis.Network(container, data, options);
 
-        // --- SISTEMA DE ANIMAÇÃO DE BOLINHAS ---
+        // --- SISTEMA DE ANIMAÇÃO DE BOLINHAS (BASEADO EM TEMPO) ---
         let particles = [];
-        const MAX_ACQUIRE_PARTICLES = 3; // Máximo de bolinhas amarelas simultâneas na tela
+        const MAX_ACQUIRE_PARTICLES = 3; 
         
-        function spawnParticle(path, color, speed = 0.012) {
+        function spawnParticle(path, color, durationMs = 2000) {
             if (path.length < 2) return;
             particles.push({
                 path: path,
-                segIndex: 0,
-                progress: 0,
                 color: color,
-                speed: speed
+                startTime: Date.now(),
+                duration: durationMs
             });
         }
 
         network.on("afterDrawing", function (ctx) {
             const pos = network.getPositions();
+            const now = Date.now();
+            
             for (let i = particles.length - 1; i >= 0; i--) {
                 let p = particles[i];
-                p.progress += p.speed;
+                let elapsed = now - p.startTime;
+                let totalProgress = elapsed / p.duration; // 0.0 a 1.0 (caminho inteiro)
 
-                // Terminou este trecho — avança para o próximo ou remove
-                if (p.progress >= 1) {
-                    p.segIndex++;
-                    if (p.segIndex >= p.path.length - 1) {
-                        particles.splice(i, 1);
-                    } else {
-                        p.progress = 0;
-                    }
+                if (totalProgress >= 1) {
+                    particles.splice(i, 1);
                     continue;
                 }
 
-                const fromId = p.path[p.segIndex];
-                const toId   = p.path[p.segIndex + 1];
+                // Descobre em qual trecho a bolinha está
+                let numSegments = p.path.length - 1;
+                let segmentProgress = totalProgress * numSegments;
+                let segIndex = Math.floor(segmentProgress);
+                let localProgress = segmentProgress - segIndex;
+
+                if (segIndex >= numSegments) {
+                    segIndex = numSegments - 1;
+                    localProgress = 1;
+                }
+
+                const fromId = p.path[segIndex];
+                const toId   = p.path[segIndex + 1];
                 let pos1 = pos[fromId];
                 let pos2 = pos[toId];
                 if (!pos1 || !pos2) continue;
 
-                let x = pos1.x + (pos2.x - pos1.x) * p.progress;
-                let y = pos1.y + (pos2.y - pos1.y) * p.progress;
+                // Interpolação exata: começa exatamente no centro do pos1
+                let x = pos1.x + (pos2.x - pos1.x) * localProgress;
+                let y = pos1.y + (pos2.y - pos1.y) * localProgress;
 
                 ctx.beginPath();
                 ctx.arc(x, y, 9, 0, 2 * Math.PI, false);
@@ -344,8 +352,8 @@
                 // Permite até MAX_ACQUIRE_PARTICLES bolinhas amarelas ao mesmo tempo
                 const yellowCount = particles.filter(p => p.color === '#facc15').length;
                 if (yellowCount < MAX_ACQUIRE_PARTICLES) {
-                    // Caminho: Cliente → Nó → Exchange (Velocidade sincronizada)
-                    spawnParticle([cId, nId, 'exchange'], '#facc15', 0.025);
+                    // Caminho: Cliente → Nó → Exchange (Leva exatamente 2.0 segundos)
+                    spawnParticle([cId, nId, 'exchange'], '#facc15', 2000);
                 }
                 
                 addLog(`Cliente ${data.client_id} → ACQUIRE no Nó ${data.node_id}`, 'log-req');
@@ -374,11 +382,11 @@
                 edges.update({ id: `e_n${data.node_id}_exchange`, color: { color: '#22c55e' }, width: 4, dashes: false });
                 edges.update({ id: 'e_res_exchange', color: { color: '#22c55e' }, width: 3, dashes: false });
                 
-                // Limpa QUALQUER bolinha verde antiga que ainda esteja na tela (Garante SÓ 1 por vez!)
+                // Limpa QUALQUER bolinha verde antiga que ainda esteja na tela
                 particles = particles.filter(p => p.color !== '#4ade80');
                 
-                // Bolinha verde: Nó → Exchange → Recurso (Rápido para chegar em ~1.3s)
-                spawnParticle([nId, 'exchange', 'resource'], '#4ade80', 0.025);
+                // Bolinha verde: Nó → Exchange → Recurso (Leva exatamente 2.2 segundos para não cruzar com o exit)
+                spawnParticle([nId, 'exchange', 'resource'], '#4ade80', 2200);
                 
                 addLog(`Nó ${data.node_id} ENTROU na Sec. Crítica!`, 'log-enter');
             }
