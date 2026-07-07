@@ -91,25 +91,40 @@ def process_F(channel, connection):
                 body=json.dumps({'status': 'COMMITTED'})
             )
 
-def on_rpc_request(ch, method, props, body):
-    """Quando o nó recebe um pedido do cliente"""
-    pedido_cliente = json.loads(body)
-    req_id = pedido_cliente.get('req_id')
-    client_id = pedido_cliente.get('client_id')
-    
-    log(f"Recebeu pedido do Cliente {client_id} (Req: {req_id[:8]}). Publicando ACQUIRE...", Fore.CYAN)
-    pending_rpc[req_id] = props
-    
-    msg_acquire = {
-        'action': 'ACQUIRE',
-        'node_id': NODE_ID,
-        'pedido_cliente': pedido_cliente,
-        'req_id': req_id # Atalho mantido para lógica interna de F
-    }
-    
-    # Publica o ACQUIRE no broker para que todos os nós (inclusive este) recebam na mesma ordem
-    ch.basic_publish(exchange='R_topic', routing_key='', body=json.dumps(msg_acquire))
-    ch.basic_ack(delivery_tag=method.delivery_tag)
+import threading
+
+def rpc_consumer_thread():
+    """Thread dedicada para ler todos os pedidos pendentes do cliente IMEDIATAMENTE.
+    Isso evita que o sleep da Seção Crítica pause a leitura dos próximos cliques."""
+    try:
+        conn = conectar()
+        ch = conn.channel()
+        sync_queue, rpc_queue_name = setup_rabbit(ch)
+        
+        # Garante que a fila existe mesmo se o dashboard não tiver declarado
+        ch.queue_declare(queue=rpc_queue_name)
+        
+        def on_rpc(ch, method, props, body):
+            pedido_cliente = json.loads(body)
+            req_id = pedido_cliente.get('req_id')
+            client_id = pedido_cliente.get('client_id')
+            
+            log(f"Recebeu pedido do Cliente {client_id} (Req: {req_id[:8]}). Publicando ACQUIRE...", Fore.CYAN)
+            pending_rpc[req_id] = props
+            
+            msg_acquire = {
+                'action': 'ACQUIRE',
+                'node_id': NODE_ID,
+                'pedido_cliente': pedido_cliente,
+                'req_id': req_id
+            }
+            ch.basic_publish(exchange='R_topic', routing_key='', body=json.dumps(msg_acquire))
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+            
+        ch.basic_consume(queue=rpc_queue_name, on_message_callback=on_rpc)
+        ch.start_consuming()
+    except Exception as e:
+        log(f"Erro na thread RPC: {e}", Fore.RED)
 
 def on_sync_message(ch, method, props, body):
     """Quando o nó recebe um ACQUIRE ou RELEASE da exchange de sincronização"""
@@ -117,23 +132,17 @@ def on_sync_message(ch, method, props, body):
     msg = json.loads(body)
     
     if msg['action'] == 'ACQUIRE':
-        # Adiciona no final da fila local F
+        # Adiciona na fila F e GARANTE a ordenação pelo Timestamp exato do clique!
+        # Isso resolve o bug da ordem quando o usuário clica muito rápido.
         F.append(msg)
-        # log(f"ACQUIRE enfileirado na posição {len(F)} (Req: {msg['req_id'][:8]})")
+        F.sort(key=lambda x: x.get('pedido_cliente', {}).get('timestamp', 0))
         
     elif msg['action'] == 'RELEASE':
-        # Remove o pedido correspondente da fila F
-        # Para encontrar pelo req_id guardado em pedido_cliente ou atalho
         req_id_to_remove = msg.get('pedido_cliente', {}).get('req_id')
         F = [req for req in F if req['req_id'] != req_id_to_remove]
-        # log(f"RELEASE processado. Tamanho da fila agora é {len(F)}")
     
     ch.basic_ack(delivery_tag=method.delivery_tag)
-    
-    # Após processar a mensagem, avalia a fila F para ver se é a vez deste nó
-    # Aqui passamos o connection porque a seção crítica dá sleep
     process_F(ch, ch.connection)
-
 
 def main():
     log("Iniciando Node do Cluster Sync...", Fore.YELLOW)
@@ -145,14 +154,13 @@ def main():
     # 1. Primeiro, começa a escutar os eventos do Cluster (ACQUIRE/RELEASE)
     channel.basic_consume(queue=sync_queue, on_message_callback=on_sync_message)
     
-    # 2. Aguarda 2 segundos ANTES de consumir os pedidos dos clientes.
-    # Isso resolve a Condição de Corrida: garante que todos os 5 nós criaram suas filas
-    # exclusivas e deram bind no exchange 'R_topic' antes de alguém começar a publicar ACQUIRE.
+    # 2. Aguarda formação do cluster
     log("Aguardando formação do cluster (2s)...", Fore.YELLOW)
     time.sleep(2.0)
     
-    # 3. Agora sim, começa a consumir os pedidos pendentes
-    channel.basic_consume(queue=rpc_queue_name, on_message_callback=on_rpc_request)
+    # 3. Inicia a thread que consome os pedidos dos clientes paralelamente
+    t = threading.Thread(target=rpc_consumer_thread, daemon=True)
+    t.start()
     
     log(f"Node operante. Escutando clientes na fila {rpc_queue_name} e sinc. na {sync_queue}", Fore.YELLOW)
     
