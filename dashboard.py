@@ -16,6 +16,7 @@ publish_queue = queue.Queue()
 
 # Estado global: True = nós rodando, cliques bloqueados
 clicks_locked = False
+total_clicks = 0
 
 def broadcast(event):
     """Envia um evento SSE para todos os navegadores conectados."""
