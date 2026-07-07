@@ -129,7 +129,7 @@ def rpc_consumer_thread():
 
 def on_sync_message(ch, method, props, body):
     """Quando o nó recebe um ACQUIRE ou RELEASE da exchange de sincronização"""
-    global F
+    global F, cluster_ready
     msg = json.loads(body)
     
     if msg['action'] == 'ACQUIRE':
