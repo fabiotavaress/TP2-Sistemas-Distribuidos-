@@ -110,7 +110,7 @@ def force_request(client_id):
     """Endpoint chamado pelo clique no front-end para forçar um pedido de cliente."""
     global clicks_locked, total_clicks
     if clicks_locked:
-        return {"status": "locked"}, 423  # 423 = Locked
+        return jsonify({"status": "locked"})
     
     total_clicks += 1
     
@@ -124,10 +124,10 @@ def force_request(client_id):
             'req_id': str(uuid.uuid4())
         }
         publish_queue.put({"type": "REAL_REQ", "queue": f'rpc_queue_{node_num}', "payload": msg})
-        return {"status": "ok"}
+        return jsonify({"status": "ok"})
     except Exception as e:
         print("Erro ao forçar request:", e)
-        return {"status": "error"}
+        return jsonify({"status": "error"})
 
 @app.route("/lock", methods=["POST"])
 def lock_clicks():
@@ -136,7 +136,7 @@ def lock_clicks():
     clicks_locked = True
     broadcast({"type": "LOCK_CLICKS"})
     print("[Dashboard] Cliques BLOQUEADOS — Nós processando pedidos.")
-    return {"status": "locked"}
+    return jsonify({"status": "locked"})
 
 @app.route("/unlock", methods=["POST"])
 def unlock_clicks():
@@ -146,7 +146,7 @@ def unlock_clicks():
     total_clicks = 0
     broadcast({"type": "UNLOCK_CLICKS"})
     print("[Dashboard] Cliques LIBERADOS — Pode fazer novos pedidos.")
-    return {"status": "unlocked"}
+    return jsonify({"status": "unlocked"})
 
 if __name__ == "__main__":
     # Inicia as threads do RabbitMQ
