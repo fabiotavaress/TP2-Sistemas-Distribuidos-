@@ -28,6 +28,10 @@ def main():
     print("Iniciando Cluster Sync do TP2 (Alternativa 3 - RabbitMQ)")
     print("Os pedidos serao feitos pelos usuarios pelo Dashboard\n")
 
+    # 0. Garante estado limpo: mata qualquer processo zumbi de simulações anteriores
+    # que possa ter ficado rodando em background e roubando mensagens das filas!
+    subprocess.run(["pkill", "-f", "sync_node.py"], stderr=subprocess.DEVNULL)
+
     # 1. Conecta ao RabbitMQ para monitoramento
     credentials = pika.PlainCredentials('admin', 'admin123')
     params = pika.ConnectionParameters(host=RABBITMQ_HOST, credentials=credentials)
