@@ -100,11 +100,20 @@ def stream():
             
     return Response(event_stream(), content_type="text/event-stream")
 
+@app.route("/get_total_clicks", methods=["GET"])
+def get_total_clicks():
+    global total_clicks
+    return jsonify({"count": total_clicks})
+
 @app.route("/force_request/<client_id>", methods=["POST"])
 def force_request(client_id):
     """Endpoint chamado pelo clique no front-end para forçar um pedido de cliente."""
+    global clicks_locked, total_clicks
     if clicks_locked:
         return {"status": "locked"}, 423  # 423 = Locked
+    
+    total_clicks += 1
+    
     try:
         node_num = client_id.replace("C", "")
         dash_event = {"type": "CLIENT_REQ", "client_id": client_id, "node_id": node_num}
@@ -132,8 +141,9 @@ def lock_clicks():
 @app.route("/unlock", methods=["POST"])
 def unlock_clicks():
     """Chamado pelo run_simulation.py ao encerrar. Libera os cliques novamente."""
-    global clicks_locked
+    global clicks_locked, total_clicks
     clicks_locked = False
+    total_clicks = 0
     broadcast({"type": "UNLOCK_CLICKS"})
     print("[Dashboard] Cliques LIBERADOS — Pode fazer novos pedidos.")
     return {"status": "unlocked"}

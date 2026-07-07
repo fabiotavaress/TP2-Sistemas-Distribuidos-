@@ -14,15 +14,15 @@ def notify_dashboard(endpoint):
     except Exception as e:
         print(f"[Aviso] Nao foi possivel notificar o dashboard ({endpoint}): {e}")
 
-def get_initial_message_count(channel):
-    total = 0
-    for i in range(1, 6):
-        try:
-            res = channel.queue_declare(queue=f'rpc_queue_{i}')
-            total += res.method.message_count
-        except Exception:
-            pass
-    return total
+def get_initial_message_count():
+    try:
+        req = urllib.request.Request(f"{DASHBOARD_URL}/get_total_clicks")
+        with urllib.request.urlopen(req) as response:
+            data = json.loads(response.read().decode())
+            return data.get("count", 0)
+    except Exception as e:
+        print(f"Erro ao contar clicks: {e}")
+        return 0
 
 def main():
     print("Iniciando Cluster Sync do TP2 (Alternativa 3 - RabbitMQ)")
@@ -43,7 +43,7 @@ def main():
         return
 
     # 2. Conta exatamente quantos pedidos existem nas filas ANTES dos nós ligarem
-    total_requests = get_initial_message_count(channel)
+    total_requests = get_initial_message_count()
     print(f"[{total_requests} pedidos pendentes encontrados nas filas]")
 
     if total_requests == 0:
