@@ -3,6 +3,7 @@ import sys
 import urllib.request
 import pika
 import json
+import time
 
 DASHBOARD_URL = "http://localhost:5000"
 RABBITMQ_HOST = "localhost"
@@ -67,6 +68,13 @@ def main():
             print(f"Iniciando No {i}...")
             p = subprocess.Popen([sys.executable, 'sync_node.py', str(i)])
             processes.append(p)
+
+        print(f"\n--- Aguardando os nos sincronizarem as filas (3 segundos)... ---\n")
+        time.sleep(3)
+        
+        # Envia sinal de largada!
+        msg_start = {"action": "START_SIMULATION"}
+        channel.basic_publish(exchange='R_topic', routing_key='', body=json.dumps(msg_start))
 
         print(f"\n--- Processando {total_requests} pedidos automaticamente. Aguarde... ---\n")
 
