@@ -12,6 +12,7 @@ RABBITMQ_HOST = "localhost"
 
 F = [] # Fila local do protocolo (Privada ao nó)
 pending_rpc = {} # Guarda as requisições RPC dos clientes para responder depois
+cluster_ready = False # Trava de consenso global
 
 def conectar():
     credentials = pika.PlainCredentials('admin', 'admin123')
