@@ -142,11 +142,17 @@ def main():
     
     sync_queue, rpc_queue_name = setup_rabbit(channel)
     
-    # Consumidor do Client RPC
-    channel.basic_consume(queue=rpc_queue_name, on_message_callback=on_rpc_request)
-    
-    # Consumidor dos eventos do Cluster (ACQUIRE/RELEASE)
+    # 1. Primeiro, começa a escutar os eventos do Cluster (ACQUIRE/RELEASE)
     channel.basic_consume(queue=sync_queue, on_message_callback=on_sync_message)
+    
+    # 2. Aguarda 2 segundos ANTES de consumir os pedidos dos clientes.
+    # Isso resolve a Condição de Corrida: garante que todos os 5 nós criaram suas filas
+    # exclusivas e deram bind no exchange 'R_topic' antes de alguém começar a publicar ACQUIRE.
+    log("Aguardando formação do cluster (2s)...", Fore.YELLOW)
+    time.sleep(2.0)
+    
+    # 3. Agora sim, começa a consumir os pedidos pendentes
+    channel.basic_consume(queue=rpc_queue_name, on_message_callback=on_rpc_request)
     
     log(f"Node operante. Escutando clientes na fila {rpc_queue_name} e sinc. na {sync_queue}", Fore.YELLOW)
     
