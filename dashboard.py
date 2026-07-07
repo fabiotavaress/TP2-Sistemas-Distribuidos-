@@ -70,6 +70,7 @@ def pika_publisher():
                 if task['type'] == 'FAKE_TELEMETRY':
                     channel.basic_publish(exchange='dashboard_topic', routing_key='', body=json.dumps(task['payload']))
                 elif task['type'] == 'REAL_REQ':
+                    channel.queue_declare(queue=task['queue'])
                     channel.basic_publish(exchange='', routing_key=task['queue'], body=json.dumps(task['payload']))
                 
         except Exception as e:

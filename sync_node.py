@@ -99,9 +99,9 @@ def rpc_consumer_thread():
     try:
         conn = conectar()
         ch = conn.channel()
-        sync_queue, rpc_queue_name = setup_rabbit(ch)
+        rpc_queue_name = f'rpc_queue_{NODE_ID}'
         
-        # Garante que a fila existe mesmo se o dashboard não tiver declarado
+        # Garante que a fila existe
         ch.queue_declare(queue=rpc_queue_name)
         
         def on_rpc(ch, method, props, body):
