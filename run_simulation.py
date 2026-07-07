@@ -84,11 +84,14 @@ def main():
     except KeyboardInterrupt:
         print("\nCtrl+C detectado. Encerrando todos os Nos...")
     finally:
-        channel.cancel()
-        connection.close()
+        try:
+            connection.close()
+        except:
+            pass
         for p in processes:
             p.terminate()
         notify_dashboard("unlock")
+        print("Nos encerrados. Cliques liberados no Dashboard.")
         print("Nos encerrados. Cliques liberados no Dashboard.")
 
 if __name__ == "__main__":

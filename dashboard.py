@@ -4,7 +4,7 @@ import threading
 import json
 import uuid
 import queue
-from flask import Flask, Response, render_template
+from flask import Flask, Response, render_template, jsonify
 
 app = Flask(__name__)
 
