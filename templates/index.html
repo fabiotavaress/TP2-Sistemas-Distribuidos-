@@ -344,8 +344,8 @@
                 // Permite até MAX_ACQUIRE_PARTICLES bolinhas amarelas ao mesmo tempo
                 const yellowCount = particles.filter(p => p.color === '#facc15').length;
                 if (yellowCount < MAX_ACQUIRE_PARTICLES) {
-                    // Caminho: Cliente → Nó → Exchange (de baixo pra cima)
-                    spawnParticle([cId, nId, 'exchange'], '#facc15', 0.013);
+                    // Caminho: Cliente → Nó → Exchange (Velocidade sincronizada)
+                    spawnParticle([cId, nId, 'exchange'], '#facc15', 0.025);
                 }
                 
                 addLog(`Cliente ${data.client_id} → ACQUIRE no Nó ${data.node_id}`, 'log-req');
@@ -377,8 +377,8 @@
                 // Limpa QUALQUER bolinha verde antiga que ainda esteja na tela (Garante SÓ 1 por vez!)
                 particles = particles.filter(p => p.color !== '#4ade80');
                 
-                // Bolinha verde: Nó → Exchange → Recurso (Velocidade ideal)
-                spawnParticle([nId, 'exchange', 'resource'], '#4ade80', 0.010);
+                // Bolinha verde: Nó → Exchange → Recurso (Rápido para chegar em ~1.3s)
+                spawnParticle([nId, 'exchange', 'resource'], '#4ade80', 0.025);
                 
                 addLog(`Nó ${data.node_id} ENTROU na Sec. Crítica!`, 'log-enter');
             }
