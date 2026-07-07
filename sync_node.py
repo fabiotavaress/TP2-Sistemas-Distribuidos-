@@ -68,7 +68,9 @@ def process_F(channel, connection):
         channel.basic_publish(exchange='dashboard_topic', routing_key='', body=json.dumps(dash_exit))
         
         # Remove a requisição dos pendentes (já foi processada)
-        props = pending_rpc.pop(top['req_id'])
+        pending_data = pending_rpc.pop(top['req_id'])
+        props = pending_data['props']
+        delivery_tag = pending_data['delivery_tag']
         
         # Envia o RELEASE para o broker
         msg_release = {
@@ -90,6 +92,10 @@ def process_F(channel, connection):
                 properties=pika.BasicProperties(correlation_id=props.correlation_id),
                 body=json.dumps({'status': 'COMMITTED'})
             )
+            
+        # AGORA SIM damos ACK na fila rpc_queue (Sinalizando que o pedido foi completamente concluído)
+        # Isso impede que o run_simulation.py encerre os nós antes da hora!
+        channel.basic_ack(delivery_tag=delivery_tag)
 
 def on_rpc_request(ch, method, props, body):
     """Quando o nó recebe um pedido do cliente"""
@@ -98,7 +104,9 @@ def on_rpc_request(ch, method, props, body):
     client_id = pedido_cliente.get('client_id')
     
     log(f"Recebeu pedido do Cliente {client_id} (Req: {req_id[:8]}). Publicando ACQUIRE...", Fore.CYAN)
-    pending_rpc[req_id] = props
+    
+    # Guarda as props e a tag para dar ACK apenas DEPOIS que sair da seção crítica
+    pending_rpc[req_id] = {'props': props, 'delivery_tag': method.delivery_tag}
     
     msg_acquire = {
         'action': 'ACQUIRE',
@@ -109,7 +117,7 @@ def on_rpc_request(ch, method, props, body):
     
     # Publica o ACQUIRE no broker para que todos os nós (inclusive este) recebam na mesma ordem
     ch.basic_publish(exchange='R_topic', routing_key='', body=json.dumps(msg_acquire))
-    ch.basic_ack(delivery_tag=method.delivery_tag)
+    # NOTA: basic_ack foi movido para o final do process_F para não esvaziar a fila rpc_queue precocemente
 
 def on_sync_message(ch, method, props, body):
     """Quando o nó recebe um ACQUIRE ou RELEASE da exchange de sincronização"""
